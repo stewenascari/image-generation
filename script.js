@@ -6,9 +6,24 @@ const downloadAllBtn = document.getElementById('downloadAllBtn');
 const downloadSection = document.getElementById('downloadSection');
 const individualDownloads = document.getElementById('individualDownloads');
 const previewArea = document.getElementById('previewArea');
+const backgroundInput = document.getElementById('backgroundInput');
 
-const backgroundImage = new Image();
-backgroundImage.src = 'images/op.jpg';
+let backgroundImage = null;
+backgroundInput.addEventListener('change', function (e) {
+  const file = e.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      const img = new Image();
+      img.onload = function () {
+        backgroundImage = img;
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+});
+
 
 let generatedCanvases = [];
 let logoImage = null;
@@ -185,20 +200,16 @@ function generateImage(text) {
     canvas.height = canvasHeight;
 
     // Fundo com blur + camada escura
-    if (backgroundImage.complete) {
+    if (backgroundImage && backgroundImage.complete) {
       ctx.filter = 'blur(8px)';
       ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
       ctx.filter = 'none';
       ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     } else {
-      backgroundImage.onload = () => {
-        ctx.filter = 'blur(8px)';
-        ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
-        ctx.filter = 'none';
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      };
+      // Fundo preto básico se não tiver imagem
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
     ctx.fillStyle = '#FFFFFF';
