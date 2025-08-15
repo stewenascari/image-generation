@@ -9,6 +9,28 @@ const previewArea = document.getElementById('previewArea');
 const backgroundInput = document.getElementById('backgroundInput');
 
 let backgroundImage = null;
+
+const clearBtn = document.getElementById('clearBtn');
+
+clearBtn.addEventListener('click', () => {
+  // Limpa texto
+  textInput.value = '';
+
+  // Limpa imagens de fundo e logo
+  backgroundInput.value = '';
+  logoInput.value = '';
+  backgroundImage = null;
+  logoImage = null;
+
+  // Limpa área de preview e download
+  previewArea.innerHTML = '<div class="text-gray-500 text-center"><div class="text-4xl mb-2">📱</div><p>As imagens aparecerão aqui após gerar</p></div>';
+  individualDownloads.innerHTML = '';
+  downloadSection.style.display = 'none';
+  
+  // Limpa canvases armazenados
+  generatedCanvases = [];
+});
+
 backgroundInput.addEventListener('change', function (e) {
   const file = e.target.files[0];
   if (file) {
