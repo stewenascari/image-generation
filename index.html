@@ -7,88 +7,85 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="style.css" />
 </head>
-<body class="bg-gradient-to-br from-purple-50 to-blue-50 min-h-screen p-4">
-    <div class="max-w-4xl mx-auto">
-        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
-            <h1 class="text-3xl font-bold text-gray-800 mb-2 text-center">📝 Gerador de Imagem com Texto</h1>
-            <p class="text-gray-600 text-center mb-8">Transforme seu texto em uma imagem formatada para redes sociais</p>
-            
-            <div class="grid md:grid-cols-2 gap-8">
-                <!-- Área de Input -->
-                <div class="space-y-6">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">📄 Seu Texto</label>
-                        <textarea 
-                            id="textInput" 
-                            placeholder="Digite ou cole seu texto aqui... Pode incluir parágrafos e formatação!"
-                            class="w-full h-64 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none text-sm"
-                        ></textarea>
-                        <button 
-                            id="formatBtn"
-                            class="mt-2 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors duration-200 text-sm font-medium"
-                        >
-                            📋 Formatar Texto
-                        </button>
-                    </div>
-                    <div>
-                      <label class="block text-sm font-medium text-gray-700 mb-2">🖼️ Fundo Personalizado</label>
-                      <input 
-                        type="file" 
-                        id="backgroundInput" 
-                        accept="image/*"
-                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      >
-                      <p class="text-xs text-gray-500 mt-1">Escolha uma imagem que será usada como fundo</p>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">🎨 Logo (Opcional)</label>
-                        <input 
-                            type="file" 
-                            id="logoInput" 
-                            accept="image/*"
-                            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        >
-                        <p class="text-xs text-gray-500 mt-1">Adicione uma logo que aparecerá no topo da imagem</p>
-                    </div>
-                    
-                    <button 
-                        id="generateBtn"
-                        class="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-4 px-6 rounded-lg hover:from-purple-700 hover:to-blue-700 transform hover:scale-105 transition-all duration-200 shadow-lg"
-                    >
-                        ✨ Gerar Imagem
-                    </button>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏴‍☠️ Gerador de Imagens</h1>
+            <p>Transforme seus textos em imagens estilosas no estilo dos spoilers de mangá</p>
+        </div>
 
-                    <button 
-                      id="clearBtn"
-                      class="w-full bg-red-500 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-600 transition-all duration-200 shadow-lg mt-2"
-                    >
-                      🧹 Limpar Tudo
-                    </button>
-                </div>
-                
-                <!-- Área de Preview -->
-                <div class="space-y-4">
-                    <label class="block text-sm font-medium text-gray-700">🖼️ Preview da Imagem</label>
-                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 min-h-64">
-                        <div id="previewArea" class="text-gray-500 text-center">
-                            <div class="text-4xl mb-2">📱</div>
-                            <p>As imagens aparecerão aqui após gerar</p>
-                        </div>
+        <div class="controls">
+            <div class="form-group">
+                <label for="title">Título Principal</label>
+                <input type="text" id="title" placeholder="Ex: One Piece Capítulo 1100 - Spoilers">
+            </div>
+
+            <div class="form-group">
+                <label for="content">Conteúdo do Texto</label>
+                <textarea id="content" placeholder="Digite aqui o conteúdo que será dividido em imagens..."></textarea>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Logo (Opcional)</label>
+                    <div class="file-input">
+                        <input type="file" id="logo" accept="image/*">
+                        <label for="logo" class="file-input-label">
+                            📷 Escolher Logo
+                        </label>
                     </div>
-                    
-                    <div id="downloadSection" class="space-y-2" style="display: none;">
-                        <button 
-                            id="downloadAllBtn"
-                            class="w-full bg-green-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-green-700 transition-colors duration-200 shadow-lg"
-                        >
-                            💾 Baixar Todas as Imagens
-                        </button>
-                        <div id="individualDownloads" class="grid grid-cols-2 gap-2"></div>
+                </div>
+
+                <div class="form-group">
+                    <label>Papel de Fundo (Opcional)</label>
+                    <div class="file-input">
+                        <input type="file" id="background" accept="image/*">
+                        <label for="background" class="file-input-label">
+                            🖼️ Escolher Fundo
+                        </label>
                     </div>
                 </div>
             </div>
+
+            <div class="form-group">
+                <label>Marca d'Água (Opcional)</label>
+                <div class="file-input">
+                    <input type="file" id="watermark" accept="image/*">
+                    <label for="watermark" class="file-input-label">
+                        💧 Escolher Marca d'Água
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="fontStyle">Estilo da Fonte</label>
+                <select id="fontStyle" style="width: 100%; padding: 12px; border: 2px solid rgba(225, 139, 208, 0.3); border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; font-family: inherit; font-size: 14px;">
+                    <option value="Poppins">Poppins (Padrão)</option>
+                    <option value="Arial">Arial</option>
+                    <option value="Impact">Impact (Negrito)</option>
+                    <option value="Comic Sans MS">Comic Sans MS</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Courier New">Courier New</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Verdana">Verdana</option>
+                </select>
+            </div>
+
+            <button class="generate-btn" onclick="generateImages()">
+                ✨ Gerar Imagens
+            </button>
+        </div>
+
+        <div class="preview-section" id="previewSection" style="display: none;">
+            <h2 class="preview-title">📸 Suas Imagens Geradas</h2>
+            <div class="images-grid" id="imagesGrid"></div>
+            <button class="download-all-btn" onclick="downloadAll()">
+                📥 Baixar Todas as Imagens
+            </button>
         </div>
     </div>
   <script src="script.js"></script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9676ca47d27b6f83',t:'MTc1Mzg5ODc4OS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9843c5b8464a12fd',t:'MTc1ODczMjUzNy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+
+</body>
 </html>

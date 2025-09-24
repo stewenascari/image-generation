@@ -1,345 +1,457 @@
-const textInput = document.getElementById('textInput');
-const logoInput = document.getElementById('logoInput');
-const generateBtn = document.getElementById('generateBtn');
-const formatBtn = document.getElementById('formatBtn');
-const downloadAllBtn = document.getElementById('downloadAllBtn');
-const downloadSection = document.getElementById('downloadSection');
-const individualDownloads = document.getElementById('individualDownloads');
-const previewArea = document.getElementById('previewArea');
-const backgroundInput = document.getElementById('backgroundInput');
+let generatedImages = [];
+        let uploadedImages = {
+            logo: null,
+            background: null,
+            watermark: null
+        };
 
-let backgroundImage = null;
+        // Handle file uploads
+        document.getElementById('logo').addEventListener('change', (e) => handleFileUpload(e, 'logo'));
+        document.getElementById('background').addEventListener('change', (e) => handleFileUpload(e, 'background'));
+        document.getElementById('watermark').addEventListener('change', (e) => handleFileUpload(e, 'watermark'));
 
-const clearBtn = document.getElementById('clearBtn');
-
-clearBtn.addEventListener('click', () => {
-  // Limpa texto
-  textInput.value = '';
-
-  // Limpa imagens de fundo e logo
-  backgroundInput.value = '';
-  logoInput.value = '';
-  backgroundImage = null;
-  logoImage = null;
-
-  // Limpa área de preview e download
-  previewArea.innerHTML = '<div class="text-gray-500 text-center"><div class="text-4xl mb-2">📱</div><p>As imagens aparecerão aqui após gerar</p></div>';
-  individualDownloads.innerHTML = '';
-  downloadSection.style.display = 'none';
-  
-  // Limpa canvases armazenados
-  generatedCanvases = [];
-});
-
-backgroundInput.addEventListener('change', function (e) {
-  const file = e.target.files[0];
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = function (e) {
-      const img = new Image();
-      img.onload = function () {
-        backgroundImage = img;
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-  }
-});
-
-
-let generatedCanvases = [];
-let logoImage = null;
-
-logoInput.addEventListener('change', function (e) {
-  const file = e.target.files[0];
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = function (e) {
-      const img = new Image();
-      img.onload = function () {
-        logoImage = img;
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-  }
-});
-
-formatBtn.addEventListener('click', function () {
-  const text = textInput.value.trim();
-  if (!text) {
-    alert('Por favor, digite algum texto primeiro!');
-    return;
-  }
-  let formattedText = text
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/^[ \t]+/gm, '')
-    .replace(/[ \t]+$/gm, '')
-    .replace(/^\s*$/gm, '')
-    .split(/\n\n+/)
-    .map(section => {
-      const lines = section.split('\n').filter(line => line.trim());
-      let result = '';
-      for (let i = 0; i < lines.length; i++) {
-        const currentLine = lines[i].trim();
-        if (!currentLine) continue;
-        if (result) {
-          const lastChar = result.slice(-1);
-          const firstChar = currentLine.charAt(0);
-          if ((!/[.!?:]$/.test(lastChar) && !/^[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ]/.test(firstChar)) || lastChar === ',' || lastChar === ';') {
-            result += ' ' + currentLine;
-          } else {
-            result += '\n' + currentLine;
-          }
-        } else {
-          result = currentLine;
+        function handleFileUpload(event, type) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    uploadedImages[type] = e.target.result;
+                    // Update label to show file selected
+                    const label = event.target.nextElementSibling;
+                    label.textContent = `✅ ${file.name}`;
+                };
+                reader.readAsDataURL(file);
+            }
         }
-      }
-      return result;
-    })
-    .filter(section => section.trim())
-    .join('\n\n')
-    .trim();
 
-  textInput.value = formattedText;
-});
+        function splitTextIntoChunks(text) {
+            const lines = text.split('\n').filter(line => line.trim() !== '');
+            
+            // Create a temporary canvas to measure text accurately with proper font
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            const selectedFont = document.getElementById('fontStyle').value;
+            tempCtx.font = `28px "${selectedFont}", Arial, sans-serif`;
+            
+            // Calculate available space per image (considering title, margins, signature, etc.)
+            const canvasHeight = 1350;
+            const titleSpace = 200; // Space for title and margins
+            const bottomSpace = 120; // Space for signature and page indicator
+            const availableContentHeight = canvasHeight - titleSpace - bottomSpace;
+            const lineHeight = 40;
+            const paragraphSpacing = 15;
+            const maxLinesPerImage = Math.floor(availableContentHeight / lineHeight) - 2; // Safety margin
+            
+            // Calculate actual lines needed for each paragraph
+            const paragraphData = [];
+            let totalLinesNeeded = 0;
+            
+            lines.forEach(line => {
+                if (line.trim() === '') {
+                    paragraphData.push({ content: '', lines: 0.5 }); // Empty line spacing
+                    totalLinesNeeded += 0.5;
+                } else {
+                    const wrappedLines = wrapText(tempCtx, line, 960); // 1080 - 120 margin
+                    const linesCount = wrappedLines.length;
+                    paragraphData.push({ content: line, lines: linesCount });
+                    totalLinesNeeded += linesCount;
+                    
+                    // Add paragraph spacing (except for last line)
+                    if (lines.indexOf(line) < lines.length - 1) {
+                        totalLinesNeeded += 0.4; // Paragraph spacing equivalent
+                    }
+                }
+            });
+            
+            // Determine how many images we need
+            let imagesNeeded = Math.ceil(totalLinesNeeded / maxLinesPerImage);
+            imagesNeeded = Math.min(4, Math.max(1, imagesNeeded)); // Between 1 and 4 images
+            
+            // If everything fits in one image, return as single chunk
+            if (imagesNeeded === 1) {
+                return [text];
+            }
+            
+            // Distribute content across multiple images
+            const chunks = [];
+            const targetLinesPerImage = totalLinesNeeded / imagesNeeded;
+            
+            let currentChunk = [];
+            let currentLinesCount = 0;
+            let currentImageIndex = 0;
+            
+            for (let i = 0; i < paragraphData.length; i++) {
+                const paragraph = paragraphData[i];
+                const isLastParagraph = i === paragraphData.length - 1;
+                const isLastImage = currentImageIndex === imagesNeeded - 1;
+                
+                // Check if adding this paragraph would exceed the target
+                const wouldExceedTarget = currentLinesCount + paragraph.lines > targetLinesPerImage;
+                const hasContent = currentChunk.length > 0;
+                const shouldStartNewImage = wouldExceedTarget && hasContent && !isLastImage;
+                
+                if (shouldStartNewImage) {
+                    // Start new image
+                    chunks.push(currentChunk.join('\n'));
+                    currentChunk = paragraph.content ? [paragraph.content] : [];
+                    currentLinesCount = paragraph.lines;
+                    currentImageIndex++;
+                } else {
+                    // Add to current image
+                    if (paragraph.content) {
+                        currentChunk.push(paragraph.content);
+                    }
+                    currentLinesCount += paragraph.lines;
+                }
+            }
+            
+            // Add the last chunk if it has content
+            if (currentChunk.length > 0) {
+                chunks.push(currentChunk.join('\n'));
+            }
+            
+            // Ensure we don't have empty chunks and don't exceed 4 images
+            const validChunks = chunks.filter(chunk => chunk.trim() !== '');
+            
+            if (validChunks.length > 4) {
+                // Merge excess chunks into the last one
+                const excess = validChunks.splice(3);
+                validChunks[3] = validChunks[3] + '\n\n' + excess.join('\n\n');
+            }
+            
+            return validChunks.length > 0 ? validChunks : [text];
+        }
 
-generateBtn.addEventListener('click', function () {
-  const text = textInput.value.trim();
-  if (!text) {
-    alert('Por favor, digite algum texto!');
-    return;
-  }
-  generateImage(text);
-});
+        async function generateImages() {
+            const title = document.getElementById('title').value.trim();
+            const content = document.getElementById('content').value.trim();
 
-downloadAllBtn.addEventListener('click', function () {
-  generatedCanvases.forEach((canvas, index) => {
-    const link = document.createElement('a');
-    link.download = `texto-formatado-parte-${index + 1}.png`;
-    link.href = canvas.toDataURL();
-    link.click();
-    setTimeout(() => { }, 100 * index);
-  });
-});
+            if (!title || !content) {
+                alert('Por favor, preencha o título e o conteúdo!');
+                return;
+            }
 
-function generateImage(text) {
-  generatedCanvases = [];
-  previewArea.innerHTML = '';
-  individualDownloads.innerHTML = '';
-  downloadSection.style.display = 'none';
+            const generateBtn = document.querySelector('.generate-btn');
+            generateBtn.disabled = true;
+            generateBtn.textContent = '⏳ Gerando...';
 
-  previewArea.innerHTML = '<div class="text-center"><div class="text-2xl">⏳</div><p>Gerando imagens...</p></div>';
+            try {
+                const textChunks = splitTextIntoChunks(content);
+                generatedImages = [];
 
-  const canvasWidth = 1080;
-  const canvasHeight = 1350;
-  const margin = 60;
-  const lineHeight = 30; // mais espaçado para melhor leitura
-  const paragraphSpacing = 50;
-  const maxWidth = canvasWidth - margin * 2;
+                for (let i = 0; i < textChunks.length; i++) {
+                    const canvas = await createImageCanvas(title, textChunks[i], i + 1, textChunks.length);
+                    generatedImages.push(canvas);
+                }
 
-  const logoSize = 100;
-  const logoTopMargin = 20;
-  const headerSpace = logoImage ? logoSize + logoTopMargin * 2 : 120;
+                displayImages();
+                document.getElementById('previewSection').style.display = 'block';
+                document.getElementById('previewSection').scrollIntoView({ behavior: 'smooth' });
 
-  const footerSpace = 80;
-  const availableHeight = canvasHeight - headerSpace - footerSpace;
+            } catch (error) {
+                console.error('Erro ao gerar imagens:', error);
+                alert('Erro ao gerar as imagens. Tente novamente.');
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.textContent = '✨ Gerar Imagens';
+            }
+        }
 
-  const paragraphs = text.split(/\n\s*\n|\r\n\s*\r\n/);
-  let allLines = [];
+        async function createImageCanvas(title, content, pageNum, totalPages) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas size (1080x1350 - Instagram portrait format)
+            canvas.width = 1080;
+            canvas.height = 1350;
 
-  const tempCanvas = document.createElement('canvas');
-  const tempCtx = tempCanvas.getContext('2d');
-  tempCtx.font = '24px Inter, Arial, sans-serif'; // fonte maior para medida
+            // Get selected font
+            const selectedFont = document.getElementById('fontStyle').value;
 
-  paragraphs.forEach((paragraph, pIndex) => {
-    if (paragraph.trim()) {
-      const paragraphLines = paragraph.trim().split('\n').filter(line => line.trim());
-      paragraphLines.forEach((paragraphLine, lineIndex) => {
-        const wrappedLines = wrapText(tempCtx, paragraphLine.trim(), maxWidth);
-        wrappedLines.forEach((line, wIndex) => {
-          allLines.push({
-            text: line,
-            isParagraphStart: lineIndex === 0 && wIndex === 0,
-            isParagraphEnd: lineIndex === paragraphLines.length - 1 && wIndex === wrappedLines.length - 1,
-            isLastParagraph: pIndex === paragraphs.length - 1,
-            isLineBreak: lineIndex > 0 && wIndex === 0
-          });
-        });
-      });
-    }
-  });
+            // Draw background
+            if (uploadedImages.background) {
+                const bgImg = new Image();
+                bgImg.src = uploadedImages.background;
+                await new Promise(resolve => {
+                    bgImg.onload = () => {
+                        ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+                        resolve();
+                    };
+                });
+            } else {
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
 
-  // Distribuir linhas por página
-  const pages = [];
-  let currentPage = [];
-  let currentHeight = 0;
+            // Set text properties
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
 
-  for (let i = 0; i < allLines.length; i++) {
-    let extraSpace = 0;
-    if (allLines[i].isParagraphStart && currentPage.length > 0) extraSpace += paragraphSpacing;
-    if (allLines[i].isLineBreak) extraSpace += 10;
-    if (allLines[i].isParagraphEnd && !allLines[i].isLastParagraph) extraSpace += 25;
+            let yPosition = 80;
 
-    if (currentHeight + lineHeight + extraSpace > availableHeight && currentPage.length > 0) {
-      pages.push(currentPage);
-      currentPage = [];
-      currentHeight = 0;
-    }
+            // Draw logo if provided
+            if (uploadedImages.logo) {
+                const logoImg = new Image();
+                logoImg.src = uploadedImages.logo;
+                await new Promise(resolve => {
+                    logoImg.onload = () => {
+                        const logoSize = 120;
+                        ctx.drawImage(logoImg, canvas.width - logoSize - 40, 20, logoSize, logoSize);
+                        resolve();
+                    };
+                });
+            }
 
-    if (allLines[i].isParagraphStart && currentPage.length > 0) currentHeight += paragraphSpacing;
-    if (allLines[i].isLineBreak) currentHeight += 10;
+            // Draw title with strong outline for better readability
+            ctx.font = `bold 48px "${selectedFont}", Arial, sans-serif`;
+            
+            const titleLines = wrapText(ctx, title, canvas.width - 120); // Match content width
+            titleLines.forEach(line => {
+                // Draw black outline (stroke)
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+                ctx.lineWidth = 6;
+                ctx.strokeText(line, 60, yPosition);
+                
+                // Draw the main text
+                ctx.fillStyle = '#e18bd0';
+                ctx.fillText(line, 60, yPosition);
+                
+                yPosition += 60;
+            });
 
-    currentPage.push(allLines[i]);
-    currentHeight += lineHeight;
+            yPosition += 50; // More space after title for better alignment
 
-    if (allLines[i].isParagraphEnd && !allLines[i].isLastParagraph) currentHeight += 25;
-  }
-  if (currentPage.length > 0) pages.push(currentPage);
+            // Reserve space for page indicator at bottom
+            let bottomReservedSpace = 60; // Base space
+            if (totalPages > 1) bottomReservedSpace += 40; // Add space for page indicator
 
-  // Limitar máximo a 4 páginas e redistribuir se precisar
-  const maxPages = 4;
-  if (pages.length > maxPages) {
-    const allLinesFlat = pages.flat();
-    const linesPerPageForced = Math.ceil(allLinesFlat.length / maxPages);
-    const redistributedPages = [];
-    for (let i = 0; i < maxPages; i++) {
-      const start = i * linesPerPageForced;
-      const end = Math.min(start + linesPerPageForced, allLinesFlat.length);
-      redistributedPages.push(allLinesFlat.slice(start, end));
-    }
-    pages.length = 0;
-    pages.push(...redistributedPages);
-  }
+            // Calculate available space - fixed font size, no auto-resizing
+            const maxYPosition = canvas.height - bottomReservedSpace;
+            
+            // Fixed font settings - consistent across all fonts
+            const fontSize = 28;
+            const lineHeight = 40;
+            const paragraphSpacing = 15;
+            
+            // Calculate content area for background cloud
+            const contentStartY = yPosition;
+            const contentHeight = maxYPosition - yPosition;
+            
+            // Draw semi-transparent background cloud behind content area
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.filter = 'blur(8px)';
+            
+            // Create rounded rectangle for content background
+            const cloudX = 40;
+            const cloudY = contentStartY - 20;
+            const cloudWidth = canvas.width - 80;
+            const cloudHeight = contentHeight + 40;
+            const radius = 25;
+            
+            ctx.beginPath();
+            ctx.moveTo(cloudX + radius, cloudY);
+            ctx.lineTo(cloudX + cloudWidth - radius, cloudY);
+            ctx.quadraticCurveTo(cloudX + cloudWidth, cloudY, cloudX + cloudWidth, cloudY + radius);
+            ctx.lineTo(cloudX + cloudWidth, cloudY + cloudHeight - radius);
+            ctx.quadraticCurveTo(cloudX + cloudWidth, cloudY + cloudHeight, cloudX + cloudWidth - radius, cloudY + cloudHeight);
+            ctx.lineTo(cloudX + radius, cloudY + cloudHeight);
+            ctx.quadraticCurveTo(cloudX, cloudY + cloudHeight, cloudX, cloudY + cloudHeight - radius);
+            ctx.lineTo(cloudX, cloudY + radius);
+            ctx.quadraticCurveTo(cloudX, cloudY, cloudX + radius, cloudY);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Reset filter
+            ctx.filter = 'none';
 
-  pages.forEach((pageLines, pageIndex) => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+            // Draw content with optimized formatting and better readability
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `${fontSize}px "${selectedFont}", Arial, sans-serif`;
+            
+            const contentLines = content.split('\n');
+            const textWidth = canvas.width - 120; // Match title width (60px margin on each side)
+            
+            contentLines.forEach((line, index) => {
+                if (yPosition >= maxYPosition) return;
+                
+                if (line.trim() === '') {
+                    yPosition += paragraphSpacing;
+                    return;
+                }
 
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
+                const wrappedLines = wrapText(ctx, line, textWidth);
+                const isBulletPoint = line.trim().startsWith('-') || line.trim().startsWith('•');
+                
+                wrappedLines.forEach((wrappedLine, wrapIndex) => {
+                    if (yPosition >= maxYPosition) return;
+                    
+                    // Add text shadow for better readability over backgrounds
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+                    ctx.shadowBlur = 4;
+                    ctx.shadowOffsetX = 2;
+                    ctx.shadowOffsetY = 2;
+                    
+                    if (isBulletPoint && wrapIndex === 0) {
+                        // First line of bullet point
+                        ctx.fillText('• ' + wrappedLine.replace(/^[-•]\s*/, ''), 60, yPosition);
+                    } else if (isBulletPoint && wrapIndex > 0) {
+                        // Continuation of bullet point - indent
+                        ctx.fillText(wrappedLine, 80, yPosition);
+                    } else {
+                        // Regular text
+                        ctx.fillText(wrappedLine, 60, yPosition);
+                    }
+                    
+                    // Reset shadow
+                    ctx.shadowColor = 'transparent';
+                    ctx.shadowBlur = 0;
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = 0;
+                    
+                    yPosition += lineHeight;
+                });
+                
+                // Add spacing between different paragraphs/bullet points
+                if (index < contentLines.length - 1 && contentLines[index + 1].trim() !== '') {
+                    yPosition += paragraphSpacing;
+                }
+            });
 
-    // Fundo com blur + camada escura
-    if (backgroundImage && backgroundImage.complete) {
-      ctx.filter = 'blur(8px)';
-      ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
-      ctx.filter = 'none';
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    } else {
-      // Fundo preto básico se não tiver imagem
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '24px Inter, Arial, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.shadowColor = 'rgba(0,0,0,0.8)';
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetX = 2;
-    ctx.shadowOffsetY = 2;
-
-    // Logo em todas as páginas, mesma posição e tamanho
-    let currentY;
-    if (logoImage) {
-      const logoX = (canvas.width - logoSize) / 2;
-      const logoY = logoTopMargin;
-      ctx.drawImage(logoImage, logoX, logoY, logoSize, logoSize);
-      currentY = logoY + logoSize + logoTopMargin;
-    } else {
-      currentY = headerSpace;
-    }
-
-    // Caixa branca semi-transparente atrás do texto
-    const textBlockHeight = availableHeight;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
-    ctx.fillRect(margin - 20, headerSpace - 10, maxWidth + 40, textBlockHeight + 20);
-
-    ctx.fillStyle = '#FFFFFF';
-
-    pageLines.forEach((line, lineIndex) => {
-      if (line.isParagraphStart && lineIndex > 0) currentY += paragraphSpacing;
-      if (line.isLineBreak) currentY += 10;
-
-      ctx.fillText(line.text, margin, currentY);
-      currentY += lineHeight;
-
-      if (line.isParagraphEnd && !line.isLastParagraph && lineIndex < pageLines.length - 1) currentY += 25;
-    });
-
-    // Número da página no rodapé
-    if (pages.length > 1) {
-      ctx.font = '18px Inter, Arial, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillStyle = 'rgba(255,255,255,0.6)';
-      ctx.fillText(`${pageIndex + 1} / ${pages.length}`, canvas.width / 2, canvas.height - 40);
-    }
-
-    ctx.shadowColor = 'transparent';
-
-    generatedCanvases.push(canvas);
-  });
-
-  const previewContainer = document.createElement('div');
-  previewContainer.className = 'space-y-6';
-
-  generatedCanvases.forEach((canvas, index) => {
-    const imageContainer = document.createElement('div');
-    imageContainer.className = 'text-center';
-
-    const label = document.createElement('p');
-    label.textContent = `Imagem ${index + 1}${generatedCanvases.length > 1 ? ` de ${generatedCanvases.length}` : ''}`;
-    label.className = 'text-sm font-medium text-gray-300 mb-3';
-
-    const img = document.createElement('img');
-    img.src = canvas.toDataURL();
-    img.className = 'max-w-full h-auto rounded-lg shadow-lg mx-auto border border-white/20';
-
-    imageContainer.appendChild(label);
-    imageContainer.appendChild(img);
-    previewContainer.appendChild(imageContainer);
-
-    const downloadBtn = document.createElement('button');
-    downloadBtn.textContent = `📥 Imagem ${index + 1}`;
-    downloadBtn.className = 'bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 transition-colors mt-2';
-    downloadBtn.onclick = () => {
-      const link = document.createElement('a');
-      link.download = `texto-formatado-parte-${index + 1}.png`;
-      link.href = canvas.toDataURL();
-      link.click();
-    };
-    individualDownloads.appendChild(downloadBtn);
-  });
-
-  previewArea.innerHTML = '';
-  previewArea.appendChild(previewContainer);
-  downloadSection.style.display = 'block';
-}
+            // Draw page indicator at bottom right if multiple pages
+            if (totalPages > 1) {
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `20px "${selectedFont}", Arial, sans-serif`;
+                ctx.textAlign = 'right';
+                
+                // Add shadow for better readability
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+                ctx.shadowBlur = 4;
+                ctx.shadowOffsetX = 2;
+                ctx.shadowOffsetY = 2;
+                
+                ctx.fillText(`${pageNum}/${totalPages}`, canvas.width - 60, canvas.height - 60);
+                
+                // Reset shadow and alignment
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+                ctx.textAlign = 'left';
+            }
 
 
-function wrapText(ctx, text, maxWidth) {
-  const words = text.split(' ');
-  const lines = [];
-  let currentLine = '';
 
-  for (let i = 0; i < words.length; i++) {
-    const testLine = currentLine + words[i] + ' ';
-    const testWidth = ctx.measureText(testLine).width;
+            // Draw watermark if provided
+            if (uploadedImages.watermark) {
+                const watermarkImg = new Image();
+                watermarkImg.src = uploadedImages.watermark;
+                await new Promise(resolve => {
+                    watermarkImg.onload = () => {
+                        ctx.globalAlpha = 0.18; // Slightly more visible but still subtle
+                        const wmSize = 600; // Large size but very transparent
+                        ctx.drawImage(watermarkImg, 
+                            (canvas.width - wmSize) / 2, 
+                            (canvas.height - wmSize) / 2, 
+                            wmSize, wmSize);
+                        ctx.globalAlpha = 1.0;
+                        resolve();
+                    };
+                });
+            }
 
-    if (testWidth > maxWidth && i > 0) {
-      lines.push(currentLine.trim());
-      currentLine = words[i] + ' ';
-    } else {
-      currentLine = testLine;
-    }
-  }
+            return canvas;
+        }
 
-  if (currentLine.trim()) {
-    lines.push(currentLine.trim());
-  }
+        function wrapText(ctx, text, maxWidth) {
+            const words = text.split(' ');
+            const lines = [];
+            let currentLine = '';
 
-  return lines;
-}
+            for (const word of words) {
+                const testLine = currentLine + (currentLine ? ' ' : '') + word;
+                const metrics = ctx.measureText(testLine);
+                
+                if (metrics.width > maxWidth && currentLine) {
+                    lines.push(currentLine);
+                    currentLine = word;
+                } else {
+                    currentLine = testLine;
+                }
+            }
+            
+            if (currentLine) {
+                lines.push(currentLine);
+            }
+            
+            return lines;
+        }
+
+        function calculateContentHeight(content, fontSize, maxWidth) {
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            const selectedFont = document.getElementById('fontStyle').value;
+            tempCtx.font = `${fontSize}px "${selectedFont}", Arial, sans-serif`;
+            
+            // Fixed values - no more dynamic sizing
+            const lineHeight = 40;
+            const paragraphSpacing = 15;
+            
+            let totalHeight = 0;
+            const contentLines = content.split('\n');
+            
+            contentLines.forEach((line, index) => {
+                if (line.trim() === '') {
+                    totalHeight += paragraphSpacing;
+                    return;
+                }
+                
+                const wrappedLines = wrapText(tempCtx, line, maxWidth);
+                totalHeight += wrappedLines.length * lineHeight;
+                
+                // Add spacing between paragraphs
+                if (index < contentLines.length - 1 && contentLines[index + 1].trim() !== '') {
+                    totalHeight += paragraphSpacing;
+                }
+            });
+            
+            return totalHeight;
+        }
+
+        function displayImages() {
+            const grid = document.getElementById('imagesGrid');
+            grid.innerHTML = '';
+
+            generatedImages.forEach((canvas, index) => {
+                const card = document.createElement('div');
+                card.className = 'image-card';
+                
+                const img = document.createElement('img');
+                img.src = canvas.toDataURL('image/png');
+                img.className = 'image-canvas';
+                img.alt = `Imagem ${index + 1}`;
+
+                const downloadBtn = document.createElement('button');
+                downloadBtn.className = 'download-btn';
+                downloadBtn.textContent = `📥 Baixar Imagem ${index + 1}`;
+                downloadBtn.onclick = () => downloadImage(canvas, index + 1);
+
+                card.appendChild(img);
+                card.appendChild(downloadBtn);
+                grid.appendChild(card);
+            });
+        }
+
+        function downloadImage(canvas, index) {
+            const link = document.createElement('a');
+            link.download = `spoiler-onepiece-${index}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        function downloadAll() {
+            generatedImages.forEach((canvas, index) => {
+                setTimeout(() => {
+                    downloadImage(canvas, index + 1);
+                }, index * 500); // Delay between downloads
+            });
+        }
