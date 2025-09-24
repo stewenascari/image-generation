@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerador de Imagens</title>
+    <title>Gerador de Imagens de Texto</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         * {
@@ -34,7 +35,7 @@
             font-size: 2.5rem;
             color: #e18bd0;
             margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
         }
 
         .header p {
@@ -43,7 +44,7 @@
         }
 
         .controls {
-            background: rgba(255,255,255,0.1);
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 15px;
             padding: 30px;
             margin-bottom: 30px;
@@ -61,18 +62,20 @@
             color: #e18bd0;
         }
 
-        .form-group input, .form-group textarea {
+        .form-group input,
+        .form-group textarea {
             width: 100%;
             padding: 12px;
             border: 2px solid rgba(225, 139, 208, 0.3);
             border-radius: 8px;
-            background: rgba(0,0,0,0.3);
+            background: rgba(0, 0, 0, 0.3);
             color: #fff;
             font-family: inherit;
             font-size: 14px;
         }
 
-        .form-group input:focus, .form-group textarea:focus {
+        .form-group input:focus,
+        .form-group textarea:focus {
             outline: none;
             border-color: #e18bd0;
             box-shadow: 0 0 10px rgba(225, 139, 208, 0.3);
@@ -109,7 +112,7 @@
             text-align: center;
             cursor: pointer;
             transition: all 0.3s ease;
-            background: rgba(0,0,0,0.2);
+            background: rgba(0, 0, 0, 0.2);
         }
 
         .file-input-label:hover {
@@ -161,7 +164,7 @@
         }
 
         .image-card {
-            background: rgba(255,255,255,0.1);
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 15px;
             padding: 20px;
             backdrop-filter: blur(10px);
@@ -171,7 +174,7 @@
         .image-canvas {
             width: 100%;
             border-radius: 10px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
         }
 
         .download-btn {
@@ -211,32 +214,38 @@
             box-shadow: 0 10px 20px rgba(76, 175, 80, 0.3);
         }
 
+        .clear-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255, 71, 87, 0.3);
+        }
+
         @media (max-width: 768px) {
             .form-row {
                 grid-template-columns: 1fr;
             }
-            
+
             .header h1 {
                 font-size: 2rem;
             }
-            
+
             .controls {
                 padding: 20px;
             }
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
-            <h1> Gerador de Imagens</h1>
+            <h1>🏴‍☠️ Gerador de Imagens</h1>
             <p>Transforme seus textos em imagens estilosas no estilo dos spoilers de mangá</p>
         </div>
 
         <div class="controls">
             <div class="form-group">
                 <label for="title">Título Principal</label>
-                <input type="text" id="title" placeholder="Digite aqui o titulo...">
+                <input type="text" id="title" placeholder="Digite aqui o Título">
             </div>
 
             <div class="form-group">
@@ -278,7 +287,8 @@
 
             <div class="form-group">
                 <label for="fontStyle">Estilo da Fonte</label>
-                <select id="fontStyle" style="width: 100%; padding: 12px; border: 2px solid rgba(225, 139, 208, 0.3); border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; font-family: inherit; font-size: 14px;">
+                <select id="fontStyle"
+                    style="width: 100%; padding: 12px; border: 2px solid rgba(225, 139, 208, 0.3); border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; font-family: inherit; font-size: 14px;">
                     <option value="Poppins">Poppins (Padrão)</option>
                     <option value="Arial">Arial</option>
                     <option value="Impact">Impact (Negrito)</option>
@@ -290,9 +300,15 @@
                 </select>
             </div>
 
-            <button class="generate-btn" onclick="generateImages()">
-                ✨ Gerar Imagens
-            </button>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px;">
+                <button class="generate-btn" onclick="generateImages()" style="margin-top: 0;">
+                    ✨ Gerar Imagens
+                </button>
+                <button class="clear-btn" onclick="clearAllFields()"
+                    style="background: linear-gradient(45deg, #ff4757, #ff3742); color: white; border: none; padding: 15px 30px; border-radius: 25px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease; margin-top: 0;">
+                    🗑️ Limpar Tudo
+                </button>
+            </div>
         </div>
 
         <div class="preview-section" id="previewSection" style="display: none;">
@@ -304,7 +320,10 @@
         </div>
     </div>
 
-    
-  <script src="script.js"></script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9843c5b8464a12fd',t:'MTc1ODczMjUzNy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+    <script src="script.js"></script>
+    <script>(function () { function c() { var b = a.contentDocument || a.contentWindow.document; if (b) { var d = b.createElement('script'); d.innerHTML = "window.__CF$cv$params={r:'9843e06d90646f8b',t:'MTc1ODczMzYzMS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);"; b.getElementsByTagName('head')[0].appendChild(d) } } if (document.body) { var a = document.createElement('iframe'); a.height = 1; a.width = 1; a.style.position = 'absolute'; a.style.top = 0; a.style.left = 0; a.style.border = 'none'; a.style.visibility = 'hidden'; document.body.appendChild(a); if ('loading' !== document.readyState) c(); else if (window.addEventListener) document.addEventListener('DOMContentLoaded', c); else { var e = document.onreadystatechange || function () { }; document.onreadystatechange = function (b) { e(b); 'loading' !== document.readyState && (document.onreadystatechange = e, c()) } } } })();</script>
+
+</body>
+
 </html>
