@@ -39,101 +39,137 @@ function handleFileUpload(event, type) {
 }
 
 function splitTextIntoChunks(text) {
-  const lines = text.split('\n').filter(line => line.trim() !== '');
+  // Preserve empty lines for better formatting
+  const lines = text.split('\n');
 
-  // Create a temporary canvas to measure text accurately with proper font
+  // Create a temporary canvas to measure text accurately with current font
   const tempCanvas = document.createElement('canvas');
   const tempCtx = tempCanvas.getContext('2d');
   const selectedFont = document.getElementById('fontStyle').value;
-  tempCtx.font = `28px "${selectedFont}", Arial, sans-serif`;
 
-  // Calculate available space per image (considering title, margins, signature, etc.)
+  // Use the EXACT same font settings as rendering
+  const fontSize = 24;
+  tempCtx.font = `${fontSize}px "${selectedFont}", Arial, sans-serif`;
+
+  // Calculate EXACT available space per image - FONT INDEPENDENT
   const canvasHeight = 1350;
-  const titleSpace = 200; // Space for title and margins
-  const bottomSpace = 120; // Space for signature and page indicator
-  const availableContentHeight = canvasHeight - titleSpace - bottomSpace;
-  const lineHeight = 40;
-  const paragraphSpacing = 15;
-  const maxLinesPerImage = Math.floor(availableContentHeight / lineHeight) - 2; // Safety margin
+  const titleSpace = 250;
+  const bottomSpace = 70;
+  const overlayTopPadding = 30;
+  const overlayBottomPadding = 40;
+  const availableContentHeight = canvasHeight - titleSpace - bottomSpace - overlayTopPadding - overlayBottomPadding;
 
-  // Calculate actual lines needed for each paragraph
-  const paragraphData = [];
-  let totalLinesNeeded = 0;
+  // Dynamic line height based on font size - works with ANY font
+  const lineHeight = Math.ceil(fontSize * 1.4); // 1.4x font size for good readability
+  const paragraphSpacing = Math.ceil(fontSize * 0.5); // 0.5x font size for paragraph spacing
+  const maxLinesPerImage = Math.floor(availableContentHeight / lineHeight);
 
-  lines.forEach(line => {
+  console.log(`📏 Formatação: Fonte=${selectedFont}, Tamanho=${fontSize}px, Altura linha=${lineHeight}px`);
+  console.log(`📐 Espaço: ${availableContentHeight}px disponível, ${maxLinesPerImage} linhas por imagem`);
+
+  // Process all lines with smart formatting
+  const processedLines = [];
+  let totalWrappedLines = 0;
+
+  lines.forEach((line, index) => {
     if (line.trim() === '') {
-      paragraphData.push({ content: '', lines: 0.5 }); // Empty line spacing
-      totalLinesNeeded += 0.5;
+      // Keep empty lines for spacing but count them
+      processedLines.push({
+        original: line,
+        wrapped: [''],
+        lineCount: 1,
+        isEmpty: true
+      });
+      totalWrappedLines += 1;
     } else {
-      const wrappedLines = wrapText(tempCtx, line, 960); // 1080 - 120 margin
-      const linesCount = wrappedLines.length;
-      paragraphData.push({ content: line, lines: linesCount });
-      totalLinesNeeded += linesCount;
-
-      // Add paragraph spacing (except for last line)
-      if (lines.indexOf(line) < lines.length - 1) {
-        totalLinesNeeded += 0.4; // Paragraph spacing equivalent
-      }
+      // Use consistent text width for all fonts - matches overlay width
+      const textWidth = 960; // Match rendering width (1020 - 60 margins)
+      const wrappedLines = wrapText(tempCtx, line, textWidth);
+      processedLines.push({
+        original: line,
+        wrapped: wrappedLines,
+        lineCount: wrappedLines.length,
+        isEmpty: false
+      });
+      totalWrappedLines += wrappedLines.length;
     }
   });
 
-  // Determine how many images we need
-  let imagesNeeded = Math.ceil(totalLinesNeeded / maxLinesPerImage);
-  imagesNeeded = Math.min(4, Math.max(1, imagesNeeded)); // Between 1 and 4 images
+  console.log(`📝 Processamento: ${lines.length} linhas originais → ${totalWrappedLines} linhas finais`);
 
-  // If everything fits in one image, return as single chunk
-  if (imagesNeeded === 1) {
+  // If everything fits in one image
+  if (totalWrappedLines <= maxLinesPerImage) {
+    console.log(`✅ Tudo cabe em 1 imagem!`);
     return [text];
   }
 
-  // Distribute content across multiple images
+  // Calculate how many images we actually need
+  const minImagesNeeded = Math.ceil(totalWrappedLines / maxLinesPerImage);
+  const actualMaxImages = Math.min(minImagesNeeded + 1, 10); // Allow up to 10 images if needed
+
+  // Smart distribution - ensure ALL text is included
+  const targetLinesPerImage = Math.ceil(totalWrappedLines / actualMaxImages);
+  console.log(`🎯 Precisa de ${minImagesNeeded} imagens mínimo, usando ${actualMaxImages} máximo`);
+  console.log(`🎯 Meta: ${targetLinesPerImage} linhas por imagem`);
+
   const chunks = [];
-  const targetLinesPerImage = totalLinesNeeded / imagesNeeded;
-
   let currentChunk = [];
-  let currentLinesCount = 0;
-  let currentImageIndex = 0;
+  let currentLineCount = 0;
 
-  for (let i = 0; i < paragraphData.length; i++) {
-    const paragraph = paragraphData[i];
-    const isLastParagraph = i === paragraphData.length - 1;
-    const isLastImage = currentImageIndex === imagesNeeded - 1;
+  for (let i = 0; i < processedLines.length; i++) {
+    const processedLine = processedLines[i];
 
-    // Check if adding this paragraph would exceed the target
-    const wouldExceedTarget = currentLinesCount + paragraph.lines > targetLinesPerImage;
+    // Smart chunking logic - NEVER lose content
+    const wouldExceedTarget = currentLineCount + processedLine.lineCount > maxLinesPerImage;
     const hasContent = currentChunk.length > 0;
-    const shouldStartNewImage = wouldExceedTarget && hasContent && !isLastImage;
+    const canCreateNewChunk = chunks.length < actualMaxImages - 1;
+    const isEmptyLine = processedLine.isEmpty;
 
-    if (shouldStartNewImage) {
-      // Start new image
+    // Only create new chunk if we would exceed the HARD limit (maxLinesPerImage)
+    if (wouldExceedTarget && hasContent && canCreateNewChunk && !isEmptyLine) {
+      // Create new chunk
       chunks.push(currentChunk.join('\n'));
-      currentChunk = paragraph.content ? [paragraph.content] : [];
-      currentLinesCount = paragraph.lines;
-      currentImageIndex++;
+      currentChunk = [processedLine.original];
+      currentLineCount = processedLine.lineCount;
+      console.log(`📦 Chunk ${chunks.length}: ${currentLineCount} linhas`);
     } else {
-      // Add to current image
-      if (paragraph.content) {
-        currentChunk.push(paragraph.content);
-      }
-      currentLinesCount += paragraph.lines;
+      // Add to current chunk
+      currentChunk.push(processedLine.original);
+      currentLineCount += processedLine.lineCount;
     }
   }
 
-  // Add the last chunk if it has content
+  // ALWAYS add the last chunk - this ensures NO content is lost
   if (currentChunk.length > 0) {
     chunks.push(currentChunk.join('\n'));
+    console.log(`📦 Chunk final: ${currentLineCount} linhas`);
   }
 
-  // Ensure we don't have empty chunks and don't exceed 4 images
-  const validChunks = chunks.filter(chunk => chunk.trim() !== '');
+  // Clean up chunks - remove leading/trailing empty lines
+  const cleanChunks = chunks.map(chunk => {
+    const lines = chunk.split('\n');
+    // Remove empty lines from start and end, but keep internal ones
+    while (lines.length > 0 && lines[0].trim() === '') lines.shift();
+    while (lines.length > 0 && lines[lines.length - 1].trim() === '') lines.pop();
+    return lines.join('\n');
+  }).filter(chunk => chunk.trim() !== '');
 
-  if (validChunks.length > 4) {
-    // Merge excess chunks into the last one
-    const excess = validChunks.splice(3);
-    validChunks[3] = validChunks[3] + '\n\n' + excess.join('\n\n');
+  // FORCE exactly 4 images maximum - merge excess into last image
+  const MAX_IMAGES = 4;
+  if (cleanChunks.length > MAX_IMAGES) {
+    const excess = cleanChunks.splice(MAX_IMAGES - 1);
+    cleanChunks[MAX_IMAGES - 1] = excess.join('\n\n');
+    console.log(`⚠️ ${excess.length} chunks em excesso mesclados na imagem 4`);
   }
 
-  return validChunks.length > 0 ? validChunks : [text];
+  // Ensure we never exceed 4 images
+  const finalChunks = cleanChunks.slice(0, MAX_IMAGES);
+
+  console.log(`✅ Resultado: ${finalChunks.length} imagens criadas (máximo 4)`);
+  console.log(`📊 Verificação: ${finalChunks.join('\n\n').length} chars vs ${text.length} chars originais`);
+
+  // Ensure we have valid chunks and ALL content is preserved
+  return finalChunks.length > 0 ? finalChunks : [text];
 }
 
 async function generateImages() {
@@ -201,7 +237,7 @@ async function createImageCanvas(title, content, pageNum, totalPages) {
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
 
-  let yPosition = 80;
+  let yPosition = 40; // Start even higher for maximum content space
 
   // Draw logo if provided
   if (uploadedImages.logo) {
@@ -209,57 +245,56 @@ async function createImageCanvas(title, content, pageNum, totalPages) {
     logoImg.src = uploadedImages.logo;
     await new Promise(resolve => {
       logoImg.onload = () => {
-        const logoSize = 120;
-        ctx.drawImage(logoImg, canvas.width - logoSize - 40, 20, logoSize, logoSize);
+        const logoSize = 80; // Even smaller logo
+        ctx.drawImage(logoImg, canvas.width - logoSize - 20, 10, logoSize, logoSize);
         resolve();
       };
     });
   }
 
   // Draw title with strong outline for better readability
-  ctx.font = `bold 48px "${selectedFont}", Arial, sans-serif`;
+  ctx.font = `bold 40px "${selectedFont}", Arial, sans-serif`; // Smaller title for more content space
 
-  const titleLines = wrapText(ctx, title, canvas.width - 120); // Match content width
+  const titleLines = wrapText(ctx, title, canvas.width - 120); // Wider title area
   titleLines.forEach(line => {
-    // Draw black outline (stroke)
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
-    ctx.lineWidth = 6;
-    ctx.strokeText(line, 60, yPosition);
+    // Draw VERY strong black outline (stroke)
+    ctx.strokeStyle = 'rgba(0, 0, 0, 1.0)';
+    ctx.lineWidth = 8;
+    ctx.strokeText(line, 60, yPosition); // Consistent margin
 
     // Draw the main text
     ctx.fillStyle = '#e18bd0';
-    ctx.fillText(line, 60, yPosition);
+    ctx.fillText(line, 60, yPosition); // Consistent margin
 
-    yPosition += 60;
+    yPosition += 48; // Tighter title line spacing
   });
 
-  yPosition += 50; // More space after title for better alignment
+  yPosition += 30; // Minimal space after title
 
-  // Reserve space for page indicator at bottom
-  let bottomReservedSpace = 60; // Base space
-  if (totalPages > 1) bottomReservedSpace += 40; // Add space for page indicator
+  // Reserve minimal space for page indicator at bottom
+  let bottomReservedSpace = 50; // Much smaller bottom space for all images
+  if (totalPages > 1) bottomReservedSpace += 20; // Small space for page indicator
 
-  // Calculate available space - fixed font size, no auto-resizing
-  const maxYPosition = canvas.height - bottomReservedSpace;
+  // Calculate available space - CONSISTENT FOR ALL IMAGES - USE ALMOST ALL SPACE
+  const maxYPosition = canvas.height - bottomReservedSpace; // Consistent limit for all images
 
-  // Fixed font settings - consistent across all fonts
-  const fontSize = 28;
-  const lineHeight = 40;
-  const paragraphSpacing = 15;
+  // Dynamic font settings that match the splitting logic
+  const fontSize = 24;
+  const lineHeight = Math.ceil(fontSize * 1.4); // Same as splitting: 1.4x font size
+  const paragraphSpacing = Math.ceil(fontSize * 0.5); // Same as splitting: 0.5x font size
 
-  // Calculate content area for background cloud
+  // Calculate content area for background cloud - STARTS WELL AFTER TITLE
   const contentStartY = yPosition;
-  const contentHeight = maxYPosition - yPosition;
 
-  // Draw semi-transparent background cloud behind content area
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-  ctx.filter = 'blur(8px)';
+  // Draw semi-transparent background cloud behind content area - STARTS WELL AFTER TITLE
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.filter = 'blur(10px)';
 
-  // Create rounded rectangle for content background
-  const cloudX = 40;
-  const cloudY = contentStartY - 20;
-  const cloudWidth = canvas.width - 80;
-  const cloudHeight = contentHeight + 40;
+  // Create rounded rectangle for content background - STARTS WELL AFTER TITLE, GOES TO BOTTOM
+  const cloudX = 30;
+  const cloudY = contentStartY + 20; // Starts well after title with more space
+  const cloudWidth = canvas.width - 60;
+  const cloudHeight = canvas.height - cloudY - bottomReservedSpace; // Respects bottom space
   const radius = 25;
 
   ctx.beginPath();
@@ -278,78 +313,101 @@ async function createImageCanvas(title, content, pageNum, totalPages) {
   // Reset filter
   ctx.filter = 'none';
 
-  // Draw content with optimized formatting and better readability
+  // MOVE TEXT POSITION TO START INSIDE THE OVERLAY
+  yPosition = cloudY + 30; // Start text INSIDE the overlay with padding
+
+  // Draw content STRICTLY within the overlay boundaries
   ctx.fillStyle = '#ffffff';
   ctx.font = `${fontSize}px "${selectedFont}", Arial, sans-serif`;
 
+  // Keep original formatting including empty lines
   const contentLines = content.split('\n');
-  const textWidth = canvas.width - 120; // Match title width (60px margin on each side)
+  const textWidth = cloudWidth - 60; // Use maximum overlay width (30px margin each side)
+  const leftMargin = cloudX + 30; // Text starts inside overlay with smaller margin
+  const overlayMaxY = cloudY + cloudHeight - 40; // Text must end before overlay ends
+
+  // Calculate available lines for this specific image
+  const availableLines = Math.floor((overlayMaxY - yPosition) / lineHeight);
+  console.log(`🖼️ Imagem ${pageNum}: ${availableLines} linhas disponíveis, ${contentLines.length} linhas de conteúdo`);
+
+  let linesUsed = 0;
 
   contentLines.forEach((line, index) => {
-    if (yPosition >= maxYPosition) return;
+    // STRICT boundary check - text MUST stay within overlay
+    if (yPosition >= overlayMaxY || linesUsed >= availableLines) return;
 
+    // Handle empty lines for better formatting
     if (line.trim() === '') {
-      yPosition += paragraphSpacing;
+      // Empty line - just add spacing if we have room
+      if (linesUsed < availableLines) {
+        yPosition += paragraphSpacing;
+        linesUsed++;
+      }
       return;
     }
 
     const wrappedLines = wrapText(ctx, line, textWidth);
     const isBulletPoint = line.trim().startsWith('-') || line.trim().startsWith('•');
 
-    wrappedLines.forEach((wrappedLine, wrapIndex) => {
-      if (yPosition >= maxYPosition) return;
+    // Check if we have space for all wrapped lines
+    if (linesUsed + wrappedLines.length > availableLines) {
+      console.log(`⚠️ Parando na linha ${index}: espaço insuficiente`);
+      return;
+    }
 
-      // Add text shadow for better readability over backgrounds
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-      ctx.shadowBlur = 4;
-      ctx.shadowOffsetX = 2;
-      ctx.shadowOffsetY = 2;
+    wrappedLines.forEach((wrappedLine, wrapIndex) => {
+      // STRICT boundary check - text MUST stay within overlay
+      if (yPosition >= overlayMaxY || linesUsed >= availableLines) return;
+
+      // Draw text with strong outline for readability
+      ctx.strokeStyle = 'rgba(0, 0, 0, 1.0)';
+      ctx.lineWidth = 5; // Optimized thickness for all fonts
+
+      let textToRender = wrappedLine;
+      let xPosition = leftMargin;
 
       if (isBulletPoint && wrapIndex === 0) {
         // First line of bullet point
-        ctx.fillText('• ' + wrappedLine.replace(/^[-•]\s*/, ''), 60, yPosition);
+        textToRender = '• ' + wrappedLine.replace(/^[-•]\s*/, '');
       } else if (isBulletPoint && wrapIndex > 0) {
         // Continuation of bullet point - indent
-        ctx.fillText(wrappedLine, 80, yPosition);
-      } else {
-        // Regular text
-        ctx.fillText(wrappedLine, 60, yPosition);
+        xPosition = leftMargin + 20; // Smaller indent for more text space
       }
 
-      // Reset shadow
-      ctx.shadowColor = 'transparent';
-      ctx.shadowBlur = 0;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 0;
+      // Draw outline first, then fill
+      ctx.strokeText(textToRender, xPosition, yPosition);
+      ctx.fillText(textToRender, xPosition, yPosition);
 
       yPosition += lineHeight;
+      linesUsed++;
     });
 
-    // Add spacing between different paragraphs/bullet points
-    if (index < contentLines.length - 1 && contentLines[index + 1].trim() !== '') {
-      yPosition += paragraphSpacing;
+    // Add spacing between paragraphs (but not after the last line)
+    if (index < contentLines.length - 1 && linesUsed < availableLines - 1) {
+      const nextLine = contentLines[index + 1];
+      // Only add spacing if next line has content
+      if (nextLine && nextLine.trim() !== '') {
+        yPosition += paragraphSpacing;
+      }
     }
   });
+
+  console.log(`✅ Imagem ${pageNum}: ${linesUsed}/${availableLines} linhas utilizadas`);
 
   // Draw page indicator at bottom right if multiple pages
   if (totalPages > 1) {
     ctx.fillStyle = '#ffffff';
-    ctx.font = `20px "${selectedFont}", Arial, sans-serif`;
+    ctx.font = `18px "${selectedFont}", Arial, sans-serif`;
     ctx.textAlign = 'right';
 
-    // Add shadow for better readability
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetX = 2;
-    ctx.shadowOffsetY = 2;
+    // Draw outline for page indicator
+    ctx.strokeStyle = 'rgba(0, 0, 0, 1.0)';
+    ctx.lineWidth = 4;
+    const pageText = `${pageNum}/${totalPages}`;
+    ctx.strokeText(pageText, canvas.width - 30, canvas.height - 30);
+    ctx.fillText(pageText, canvas.width - 30, canvas.height - 30);
 
-    ctx.fillText(`${pageNum}/${totalPages}`, canvas.width - 60, canvas.height - 60);
-
-    // Reset shadow and alignment
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
+    // Reset alignment
     ctx.textAlign = 'left';
   }
 
